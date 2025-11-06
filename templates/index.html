@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bingo Board</title>
+
+  <style>
+    body {
+      margin: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      background: #f7f9fc;
+      font-family: sans-serif;
+    }
+
+    .board-wrap {
+      width: 100%;
+      max-width: 560px;
+      text-align: center;
+    }
+
+    h1 { margin-bottom: 16px; }
+
+    .bingo-grid {
+        display: grid;
+        gap: 8px; /* spacing between cells */
+        
+        /* 5 equal columns (adjust number based on your board) */
+        grid-template-columns: repeat(5, 1fr);
+        
+        /* 5 equal rows */
+        grid-template-rows: repeat(5, 1fr);
+
+        /* optional: make sure the grid takes max width */
+        width: 100%;
+        max-width: 560px;
+        }
+
+        /* Each cell */
+        .cell {
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        display: flex;
+        justify-content: center; /* center horizontally */
+        align-items: center;     /* center vertically */
+        cursor: pointer;
+        font-weight: bold;
+        font-size: clamp(0.9rem, 2.8vw, 1.05rem);
+        aspect-ratio: 1 / 1;    /* makes the cell square automatically */
+        transition: all 0.1s ease-in-out;
+        }
+
+        .cell.marked {
+        background: #1f6feb;
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(31,107,235,0.25);
+        }
+
+  </style>
+</head>
+<body>
+  <div class="board-wrap">
+    <h1>Bingo Board</h1>
+    <div class="bingo-grid">
+      {% for row in board %}
+        {% for cell in row %}
+          <div class="cell">{{ cell }}</div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>
+    // Toggle marked state on click
+    document.querySelectorAll('.cell').forEach(cell => {
+      cell.addEventListener('click', () => {
+        cell.classList.toggle('marked');
+      });
+    });
+  </script>
+</body>
+</html>
