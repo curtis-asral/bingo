@@ -1,5 +1,40 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, url_for, redirect
 import random
+import string
+import os
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
+import datetime
+import logging
+
+# --- Configuration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s: %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Replace 'path/to/your/serviceAccountKey.json' with the actual path to your downloaded JSON file.
+SERVICE_ACCOUNT_KEY_PATH = 'serviceAccountKey.json'
+
+# Your Realtime Database URL (from your project details)
+DATABASE_URL = 'https://bingo-17102-default-rtdb.firebaseio.com'
+
+# --- Initialize Firebase Admin SDK ---
+try:
+    cred = credentials.Certificate(SERVICE_ACCOUNT_KEY_PATH)
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': DATABASE_URL
+    })
+    logger.info("Firebase Admin SDK initialized successfully.")
+except Exception as e:
+    logger.exception("Error initializing Firebase Admin SDK: %s", e)
+    logger.error("Please ensure 'serviceAccountKey.json' is correctly placed and valid.")
+    exit()
+    
+# --- Get a database reference ---
+ref = db.reference('/') # Reference to the root of your database
 
 app = Flask(__name__)
 
@@ -26,6 +61,52 @@ def get_bingo_board():
     board[3][2] = 'FREE'
     return board
 
+
+def generate_game_id():
+    return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+
+
+def generate_board_id(game_id):
+    num_players = int(ref.child('game_ids').child(game_id).child('num_players').get())
+    board_id = num_players + 1
+    return board_id
+
+
+def initialize_game():
+    game_id = generate_game_id()
+
+    new_game_data = {
+        game_id: {
+            "board_ids": {},
+            "numbers": [],
+            "num_players": 0,
+            "expiration": datetime.datetime.now().timestamp() + 60 * 60 * 24, # Expire after 24 hours
+        }
+    }
+
+    try:
+        ref.child('game_ids').child(game_id).set(new_game_data)
+        logger.info("Successfully initialized game '%s'.", game_id)
+    except Exception as e:
+        logger.exception("Error initializing game '%s': %s", game_id, e)
+        
+    return game_id
+
+
+def initialize_board(game_id):
+    board_id = generate_board_id(game_id)
+    board = get_bingo_board()
+    
+    # Update num players and board
+    try:
+        ref.child('game_ids').child(game_id).child('num_players').set(board_id)
+        ref.child('game_ids').child(game_id).child('board_ids').child(board_id).set(board)
+        logger.info("Successfully initialized board '%s'.", board_id)
+    except Exception as e:
+        logger.exception("Error initializing board '%s': %s", board_id, e)
+        
+    return board_id
+    
 
 @app.route("/", methods=["GET"])
 def index():
@@ -56,6 +137,23 @@ def reset():
     CALLED_NUMBERS = []
 
     return jsonify({"success": True})
+
+
+@app.route("/host", methods=["GET"])
+def init_host():
+    game_id = initialize_game()
+    return redirect(url_for("host", game_id=game_id))
+
+
+@app.route("/host/<game_id>", methods=["GET"])
+def host(game_id):
+    game_url = url_for("join", game_id=game_id)
+    return render_template("host.html", game_id=game_id)
+
+@app.route("/<game_id>", methods=["GET"])
+def join(game_id):
+    board_id = initialize_board(game_id)
+    return render_template("join.html", game_id=game_id)
 
 
 @app.after_request
